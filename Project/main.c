@@ -94,6 +94,7 @@
 #include "task.h"
 
 /* Standard demo includes. */
+/*
 #include "AbortDelay.h"
 #include "BlockQ.h"
 #include "blocktim.h"
@@ -114,6 +115,7 @@
 #include "semtest.h"
 #include "TaskNotify.h"
 #include "TimerDemo.h"
+*/
 
 /* Priorities at which the tasks are created. */
 #define mainCHECK_TASK_PRIORITY			( configMAX_PRIORITIES - 2 )
@@ -151,6 +153,7 @@ int main ( void )
 	xTaskCreate( prvCheckTask, "Check", configMINIMAL_STACK_SIZE, NULL, mainCHECK_TASK_PRIORITY, NULL );
 
 	/* Create the standard demo tasks. */
+	/*
 	vStartIntegerMathTasks( mainINTEGER_TASK_PRIORITY );
 	vStartMathTasks( mainFLOP_TASK_PRIORITY );
 	vStartBlockingQueueTasks( mainBLOCK_Q_PRIORITY );
@@ -170,11 +173,12 @@ int main ( void )
 	vStartQueueSetPollingTask();
 	vStartQueueOverwriteTask( mainQUEUE_OVERWRITE_PRIORITY );
 	vStartTaskNotifyTask();
+	*/
 
 	#if( configUSE_PREEMPTION != 0  )
 	{
 		/* Don't expect these tasks to pass when preemption is not used. */
-		vStartTimerDemoTask( mainTIMER_TEST_PERIOD );
+		//vStartTimerDemoTask( mainTIMER_TEST_PERIOD );
 	}
 	#endif
 
@@ -182,7 +186,7 @@ int main ( void )
 	tasks were running prior to their creation.  This then allows them to
 	ascertain whether or not the correct/expected number of tasks are running at
 	any given time. */
-	vCreateSuicidalTasks( mainCREATOR_TASK_PRIORITY );
+	//vCreateSuicidalTasks( mainCREATOR_TASK_PRIORITY );
 
 	/* Start the scheduler itself. */
 	vTaskStartScheduler();
@@ -213,13 +217,16 @@ const TickType_t xCycleFrequency = pdMS_TO_TICKS( 2500UL );
 		#if( configUSE_PREEMPTION != 0 )
 		{
 			/* These tasks are only created when preemption is used. */
+			/*
 			if( xAreTimerDemoTasksStillRunning( xCycleFrequency ) != pdTRUE )
 			{
 				pcStatusMessage = "Error: TimerDemo";
 			}
+			*/
 		}
 		#endif
 
+		/*
 		if( xAreIntegerMathsTaskStillRunning() != pdTRUE )
 	    {
 			pcStatusMessage = "Error: IntMath";
@@ -296,6 +303,7 @@ const TickType_t xCycleFrequency = pdMS_TO_TICKS( 2500UL );
 		{
 			pcStatusMessage = "Error: Death";
 		}
+		*/
 		
 		/* This is the only task that uses stdout so its ok to call printf()
 		directly. */
@@ -352,26 +360,26 @@ void vApplicationTickHook( void )
 	#if( configUSE_PREEMPTION != 0 )
 	{
 		/* Only created when preemption is used. */
-		vTimerPeriodicISRTests();
+		//vTimerPeriodicISRTests();
 	}
 	#endif
 
 	/* Call the periodic queue overwrite from ISR demo. */
-	vQueueOverwritePeriodicISRDemo();
+	//vQueueOverwritePeriodicISRDemo();
 
 	/* Write to a queue that is in use as part of the queue set demo to
 	demonstrate using queue sets from an ISR. */
-	vQueueSetAccessQueueSetFromISR();
-	vQueueSetPollingInterruptAccess();
+	//vQueueSetAccessQueueSetFromISR();
+	//vQueueSetPollingInterruptAccess();
 
 	/* Exercise event groups from interrupts. */
-	vPeriodicEventGroupsProcessing();
+	//vPeriodicEventGroupsProcessing();
 
 	/* Exercise giving mutexes from an interrupt. */
-	vInterruptSemaphorePeriodicTest();
+	//vInterruptSemaphorePeriodicTest();
 
 	/* Exercise using task notifications from an interrupt. */
-	xNotifyTaskFromISR();
+	//xNotifyTaskFromISR();
 }
 /*-----------------------------------------------------------*/
 
