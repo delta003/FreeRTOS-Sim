@@ -190,7 +190,14 @@ typedef enum
  *
  * \ingroup TaskUtils
  */
-#define tskIDLE_PRIORITY			( ( UBaseType_t ) 0U )
+#define tskIDLE_PRIORITY			( ( UBaseType_t ) 1U )
+
+/**
+ * Defines the priority used by the aperiodic tasks.
+ *
+ * \ingroup TaskUtils
+ */
+#define tskAPERIODIC_PRIORITY			( ( UBaseType_t ) 0U )
 
 /**
  * task. h

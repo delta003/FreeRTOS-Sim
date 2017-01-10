@@ -97,7 +97,7 @@
 #define mainTHEORETICAL_VALIDATION_RUN              ( 0 )
 #define mainTHEORETICAL_MAX_TASKS                   ( 50 )
 
-#define mainAPERIODIC_TASK_PROBABILITY              ( 10 )
+#define mainAPERIODIC_TASK_PROBABILITY              ( 80 )
 #define mainAPERIODIC_SHORT_TASK_PROBABILITY_UPPER  ( 50 )
 #define mainAPERIODIC_LONG_TASK_PROBABILITY_LOWER   ( 80 )
 
@@ -207,11 +207,11 @@ int main ( void )
     if ( configSEED_APERIODIC_TASKS )
     {
         xPeriodicTaskCreate( vAperiodicSeederTaskFunction,
-                             "p-ast-1",
+                             "p-seedert-2",
                              configMINIMAL_STACK_SIZE,
                              NULL,
-                             tskIDLE_PRIORITY + 1,
-                             200 );
+                             tskIDLE_PRIORITY + 6,
+                             2000 );
     }
 
 	/* Start the scheduler itself. */
@@ -258,7 +258,6 @@ void vShortTaskFunction( void *pvParameters )
     created instance of the task. (The prefixes added to variable names are described in
     section 1.5, Data Types and Coding Style Guide.) */
     int32_t li;
-    prvPrintString( "short task" );
     for ( li = 0; li < 50000000; li++ );
     /* Should the task implementation ever break out of the above loop, then the task
     must be deleted before reaching the end of its implementing function. The NULL
@@ -271,7 +270,6 @@ void vShortTaskFunction( void *pvParameters )
 void vMediumTaskFunction( void *pvParameters )
 {
     int32_t li;
-    prvPrintString( "medium task" );
     for ( li = 0; li < 100000000; li++ );
     vTaskDelete( NULL );
 }
@@ -279,7 +277,6 @@ void vMediumTaskFunction( void *pvParameters )
 void vLongTaskFunction( void *pvParameters )
 {
     int32_t li;
-    prvPrintString( "long task" );
     for ( li = 0; li < 1000000000; li++ );
     vTaskDelete( NULL );
 }

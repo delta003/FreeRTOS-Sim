@@ -263,43 +263,15 @@ count overflows. */
 
 #define taskPROCESS_PERIODIC_TASKS( xJustUpdate )							                        \
 {                                                                                                   \
-ListItem_t *pxCurrListItem;                                                                         \
-PeriodicTask_t *pxCurrPeriodicTask;                                                                 \
-UBaseType_t uxListLength;                                                                           \
-    if ( !listLIST_IS_EMPTY( &( xPeriodicTaskList ) ) ) {                                           \
-        uxListLength = listCURRENT_LIST_LENGTH( &( xPeriodicTaskList ) );                           \
-        pxCurrListItem = listGET_HEAD_ENTRY( &( xPeriodicTaskList ) );                              \
-        for ( UBaseType_t i = 0; i < uxListLength; i++ )                                            \
-        {                                                                                           \
-            pxCurrPeriodicTask = listGET_LIST_ITEM_OWNER( pxCurrListItem );                         \
-            if ( xJustUpdate == pdTRUE )                                                            \
-            {                                                                                       \
-                if ( pxCurrPeriodicTask->ulCreateCountDownTicks == 0 )                              \
-                {                                                                                   \
-                    xPeriodicToBeCreated = pdTRUE;                                                  \
-                    pxCurrPeriodicTask->ulCreateCountDownTicks =                                    \
-                        pxCurrPeriodicTask->ulTaskPeriodTicks;                                      \
-                }                                                                                   \
-                else                                                                                \
-                {                                                                                   \
-                    pxCurrPeriodicTask->ulCreateCountDownTicks--;                                   \
-                }                                                                                   \
-            }                                                                                       \
-            else if ( pxCurrPeriodicTask->ulCreateCountDownTicks ==                                 \
-                      pxCurrPeriodicTask->ulTaskPeriodTicks)                                        \
-            {                                                                                       \
-                xTaskCreateExtended( pxCurrPeriodicTask->pxTaskCode,                                \
-                             pxCurrPeriodicTask->pcTaskName,                                        \
-                             pxCurrPeriodicTask->usTaskStackDepth,                                  \
-                             pxCurrPeriodicTask->pvTaskParameters,                                  \
-                             pxCurrPeriodicTask->uxTaskPriority,                                    \
-                             NULL,                                                                  \
-                             pdTRUE,                                                                \
-                             pxCurrPeriodicTask->ulTaskPeriodTicks );                               \
-            }                                                                                       \
-            pxCurrListItem = listGET_NEXT(pxCurrListItem);                                          \
-        }                                                                                           \
-    }													                                            \
+    prvProcessPeriodicTasks( xJustUpdate );                                                         \
+}
+
+/*-----------------------------------------------------------*/
+
+#define taskSELECT_APERIODIC_TASK()                                                                 \
+{                                                                                                   \
+    configASSERT( ! listLIST_IS_EMPTY( &( pxReadyTasksLists[ tskAPERIODIC_PRIORITY ] ) ) );         \
+    pxCurrentTCB = listGET_OWNER_OF_HEAD_ENTRY( &( pxReadyTasksLists[ tskAPERIODIC_PRIORITY ] ) );  \
 }
 
 /*-----------------------------------------------------------*/
@@ -432,22 +404,11 @@ typedef struct xTASK_PERIODIC
     UBaseType_t uxTaskPriority;
     uint32_t ulTaskPeriodTicks;
 
-    /* New task is created whenevet this counter drops to 0. */
+    /* New task is created whenever this counter drops to 0. */
     uint32_t ulCreateCountDownTicks;
 
     ListItem_t xPeriodicListItem;
 } PeriodicTask_t;
-
-/* Aperiodic task parameters. */
-typedef struct xTASK_APERIODIC
-{
-    TaskFunction_t pxTaskCode;
-    const char *pcTaskName;
-    uint16_t usTaskStackDepth;
-    void *pvTaskParameters;
-
-    ListItem_t	xAperiodicListItem;
-} AperiodicTask_t;
 
 /*lint -e956 A manual analysis and inspection has been used to determine which
 static variables must be declared volatile. */
@@ -462,7 +423,6 @@ PRIVILEGED_DATA static List_t * volatile pxDelayedTaskList;				/*< Points to the
 PRIVILEGED_DATA static List_t * volatile pxOverflowDelayedTaskList;		/*< Points to the delayed task list currently being used to hold tasks that have overflowed the current tick count. */
 PRIVILEGED_DATA static List_t xPendingReadyList;						/*< Tasks that have been readied while the scheduler was suspended.  They will be moved to the ready list when the scheduler is resumed. */
 PRIVILEGED_DATA static List_t xPeriodicTaskList;                        /*< Periodic tasks. */
-PRIVILEGED_DATA static List_t xAperiodicTaskList;                       /*< Aperiodic tasks. */
 
 #if( INCLUDE_vTaskDelete == 1 )
 
@@ -480,7 +440,6 @@ PRIVILEGED_DATA static List_t xAperiodicTaskList;                       /*< Aper
 /* Other file private variables. --------------------------------*/
 PRIVILEGED_DATA static volatile UBaseType_t uxCurrentNumberOfTasks 	         = ( UBaseType_t ) 0U;
 PRIVILEGED_DATA static volatile UBaseType_t uxCurrentNumberOfPeriodicTasks   = ( UBaseType_t ) 0U;
-PRIVILEGED_DATA static volatile UBaseType_t uxCurrentNumberOfAperiodicTasks  = ( UBaseType_t ) 0U;
 PRIVILEGED_DATA static volatile TickType_t xTickCount 				         = ( TickType_t ) 0U;
 PRIVILEGED_DATA static volatile UBaseType_t uxTopReadyPriority 		         = tskIDLE_PRIORITY;
 PRIVILEGED_DATA static volatile BaseType_t xSchedulerRunning 		         = pdFALSE;
@@ -490,13 +449,8 @@ PRIVILEGED_DATA static volatile BaseType_t xNumOfOverflows 			         = ( BaseT
 PRIVILEGED_DATA static UBaseType_t uxTaskNumber 					         = ( UBaseType_t ) 0U;
 PRIVILEGED_DATA static volatile TickType_t xNextTaskUnblockTime		         = ( TickType_t ) 0U; /* Initialised to portMAX_DELAY before the scheduler starts. */
 PRIVILEGED_DATA static TaskHandle_t xIdleTaskHandle					         = NULL; /*< Holds the handle of the idle task.  The idle task is created automatically when the scheduler is started. */
+PRIVILEGED_DATA static volatile uint32_t ulCurrPollingServerCap              = 0U;
 PRIVILEGED_DATA static volatile BaseType_t xPeriodicToBeCreated              = pdFALSE;
-
-#if ( configCREATE_POLLING_SERVER == 1 )
-
-    PRIVILEGED_DATA static TaskHandle_t xPollingServerTaskHandle                 = NULL; /*< Holds the handle of the polling server task.  The polling server task is created automatically when the scheduler is started. */
-
-#endif
 
 /* Context switches are held pending while the scheduler is suspended.  Also,
 interrupts must not manipulate the xStateListItem of a TCB, or any of the
@@ -561,6 +515,13 @@ static void prvInitialiseTaskLists( void ) PRIVILEGED_FUNCTION;
  *
  */
 static portTASK_FUNCTION_PROTO( prvIdleTask, pvParameters );
+
+/*
+ * Polling server for aperiodic task support.
+ */
+#if ( configCREATE_POLLING_SERVER == 1 )
+    static portTASK_FUNCTION_PROTO( prvPollingServerTask, pvParameters );
+#endif
 
 /*
  * Utility to free all memory allocated by the scheduler to hold a TCB,
@@ -675,6 +636,10 @@ static void prvInitialiseNewTask( 	TaskFunction_t pxTaskCode,
  */
 static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 
+/*
+ * Updates periodic tasks and create those which period started.
+ */
+static void prvProcessPeriodicTasks( BaseType_t xJustUpdate ) PRIVILEGED_FUNCTION;
 
 /*
  * Updates TCB using RM scheduling.
@@ -684,7 +649,7 @@ static void prvRMUpdateCurrentTCB( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 
 #if ( configPRINT_FOR_TIMELINE == 1 )
 
-    PRIVILEGED_DATA static FILE *pxTimelineFile   = NULL;
+    PRIVILEGED_DATA static FILE *pxTimelineFile     = NULL;
     PRIVILEGED_DATA static uint32_t ulPrintedTicks  = 0;
 
     static void prvPrintForTimeline( void );
@@ -932,7 +897,7 @@ static void prvRMUpdateCurrentTCB( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
                                      const uint16_t usStackDepth,
                                      void * const pvParameters )
     {
-        // TODO
+        return xTaskCreate( pxTaskCode, pcName, usStackDepth, pvParameters, tskAPERIODIC_PRIORITY, NULL );
     }
 
 #endif /* configSUPPORT_DYNAMIC_ALLOCATION */
@@ -1221,6 +1186,51 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 	}
 }
 /*-----------------------------------------------------------*/
+
+static void prvProcessPeriodicTasks( BaseType_t xJustUpdate )
+{
+    ListItem_t *pxCurrListItem;
+    PeriodicTask_t *pxCurrPeriodicTask;
+    UBaseType_t uxListLength;
+    if ( !listLIST_IS_EMPTY( &( xPeriodicTaskList ) ) ) {
+        uxListLength = listCURRENT_LIST_LENGTH( &( xPeriodicTaskList ) );
+        pxCurrListItem = listGET_HEAD_ENTRY( &( xPeriodicTaskList ) );
+        for ( UBaseType_t i = 0; i < uxListLength; i++ )
+        {
+            pxCurrPeriodicTask = listGET_LIST_ITEM_OWNER( pxCurrListItem );
+            if ( xJustUpdate == pdTRUE )
+            {
+                if ( pxCurrPeriodicTask->ulCreateCountDownTicks == 0 )
+                {
+                    xPeriodicToBeCreated = pdTRUE;
+                    pxCurrPeriodicTask->ulCreateCountDownTicks =
+                        pxCurrPeriodicTask->ulTaskPeriodTicks;
+                }
+                else
+                {
+                    pxCurrPeriodicTask->ulCreateCountDownTicks--;
+                }
+            }
+            else if ( pxCurrPeriodicTask->ulCreateCountDownTicks ==
+                      pxCurrPeriodicTask->ulTaskPeriodTicks)
+            {
+                if ( strcmp( pxCurrPeriodicTask->pcTaskName, "POLLING-SERVER" ) == 0 )
+                {
+                    ulCurrPollingServerCap = configPOLLING_SERVER_TICKS_CAP;
+                }
+                xTaskCreateExtended( pxCurrPeriodicTask->pxTaskCode,
+                                     pxCurrPeriodicTask->pcTaskName,
+                                     pxCurrPeriodicTask->usTaskStackDepth,
+                                     pxCurrPeriodicTask->pvTaskParameters,
+                                     pxCurrPeriodicTask->uxTaskPriority,
+                                     NULL,
+                                     pdTRUE,
+                                     pxCurrPeriodicTask->ulTaskPeriodTicks );
+            }
+            pxCurrListItem = listGET_NEXT(pxCurrListItem);
+        }
+    }
+}
 
 static void prvRMSelectPriorityTask( UBaseType_t uxTopPriority )
 {
@@ -2093,8 +2103,14 @@ BaseType_t xReturn;
 	#if ( configCREATE_POLLING_SERVER == 1 )
 	{
         /* Creates polling server periodic task. */
-        // TODO
-
+        if ( xReturn == pdPASS )
+        {
+            xReturn = xPeriodicTaskCreate( prvPollingServerTask,
+                                           "POLLING-SERVER", configMINIMAL_STACK_SIZE,
+                                           ( void * ) NULL,
+                                           tskIDLE_PRIORITY + 1,
+                                           configPOLLING_SERVER_PERIOD_MS);
+        }
 	}
     #endif /* configCREATE_POLLING_SERVER */
 
@@ -3031,6 +3047,18 @@ void vTaskSwitchContext( void )
         if ( !xPeriodicToBeCreated )
         {
             taskSELECT_HIGHEST_PRIORITY_TASK();
+            if ( strcmp( pxCurrentTCB->pcTaskName, "POLLING-SERVER" ) == 0 )
+            {
+                if ( listLIST_IS_EMPTY( &( pxReadyTasksLists[ tskAPERIODIC_PRIORITY ] ) ) )
+                {
+                    ulCurrPollingServerCap = 0;
+                }
+                if ( ulCurrPollingServerCap > 0 )
+                {
+                    ulCurrPollingServerCap--;
+                    taskSELECT_APERIODIC_TASK();
+                }
+            }
         }
         else
         {
@@ -3478,6 +3506,24 @@ static portTASK_FUNCTION( prvIdleTask, pvParameters )
 		#endif /* configUSE_TICKLESS_IDLE */
 	}
 }
+/*-----------------------------------------------------------*/
+
+/*
+ * -----------------------------------------------------------
+ * The Polling Server task.
+ * ----------------------------------------------------------
+ */
+#if ( configCREATE_POLLING_SERVER == 1 )
+
+static portTASK_FUNCTION( prvPollingServerTask, pvParameters )
+{
+    /* Stop warnings. */
+    ( void ) pvParameters;
+
+    vTaskDelete( NULL );
+}
+
+#endif /* configCREATE_POLLING_SERVER */
 /*-----------------------------------------------------------*/
 
 #if( configUSE_TICKLESS_IDLE != 0 )

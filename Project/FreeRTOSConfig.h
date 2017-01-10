@@ -47,8 +47,10 @@
 #define configGENERATE_RUN_TIME_STATS		    0
 
 /* Periodic and aperiodic tasks config. */
-#define configCREATE_POLLING_SERVER             0 /* Support aperiodic tasks. */
-#define configSEED_APERIODIC_TASKS              0 /* Make periodic seeder task. */
+#define configCREATE_POLLING_SERVER             1
+#define configPOLLING_SERVER_TICKS_CAP          100
+#define configPOLLING_SERVER_PERIOD_MS          5000
+#define configSEED_APERIODIC_TASKS              1
 #define configPRINT_FOR_TIMELINE                1
 #define configTIMELINE_MAX_TICKS                10000
 #define configTIMELINE_FILE_PATH                "/Users/mbakovic/FreeRTOS-Sim/timeline/data.txt"
