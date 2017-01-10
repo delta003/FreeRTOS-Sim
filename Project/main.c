@@ -89,104 +89,130 @@
 /* Standard includes. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
 
-/* Standard demo includes. */
+#define mainTHEORETICAL_VALIDATION_RUN              ( 0 )
+#define mainTHEORETICAL_MAX_TASKS                   ( 50 )
+
+#define mainAPERIODIC_TASK_PROBABILITY              ( 10 )
+#define mainAPERIODIC_SHORT_TASK_PROBABILITY_UPPER  ( 50 )
+#define mainAPERIODIC_LONG_TASK_PROBABILITY_LOWER   ( 80 )
+
 /*
-#include "AbortDelay.h"
-#include "BlockQ.h"
-#include "blocktim.h"
-#include "countsem.h"
-#include "death.h"
-#include "dynamic.h"
-#include "EventGroupsDemo.h"
-#include "flop.h"
-#include "GenQTest.h"
-#include "integer.h"
-#include "IntSemTest.h"
-#include "PollQ.h"
-#include "QPeek.h"
-#include "QueueOverwrite.h"
-#include "QueueSet.h"
-#include "QueueSetPolling.h"
-#include "recmutex.h"
-#include "semtest.h"
-#include "TaskNotify.h"
-#include "TimerDemo.h"
-*/
+ * Support for theoretical validation of schedulability.
+ */
+typedef struct tskPeriodic
+{
+    int32_t lPeriodMS;
+    int32_t lDurationMS;
+} tskPeriodic;
 
-/* Priorities at which the tasks are created. */
-#define mainCHECK_TASK_PRIORITY			( configMAX_PRIORITIES - 2 )
-#define mainQUEUE_POLL_PRIORITY			( tskIDLE_PRIORITY + 1 )
-#define mainSEM_TEST_PRIORITY			( tskIDLE_PRIORITY + 1 )
-#define mainBLOCK_Q_PRIORITY			( tskIDLE_PRIORITY + 2 )
-#define mainCREATOR_TASK_PRIORITY		( tskIDLE_PRIORITY + 3 )
-#define mainINTEGER_TASK_PRIORITY		( tskIDLE_PRIORITY )
-#define mainGEN_QUEUE_TASK_PRIORITY		( tskIDLE_PRIORITY )
-#define mainFLOP_TASK_PRIORITY			( tskIDLE_PRIORITY )
-#define mainQUEUE_OVERWRITE_PRIORITY	( tskIDLE_PRIORITY )
+typedef struct tskAperiodic
+{
+    int32_t lArrivalMS;
+    int32_t lDurationMS;
+} tskAperiodic;
 
-#define mainTIMER_TEST_PERIOD			( 50 )
+typedef struct theoreticalTasks
+{
+    tskPeriodic xPeriodicTasks[ mainTHEORETICAL_MAX_TASKS ];
+    int16_t iPeriodicCount;
+    tskAperiodic xAperiodicTasks[ mainTHEORETICAL_MAX_TASKS ];
+    int16_t iAperiodicCount;
+} theoreticalTasks;
 
+void prvTheoreticalAddPeriodic( int32_t, int32_t, theoreticalTasks *pxTasks );
+void prvTheoreticalAddAperiodic( int32_t, int32_t, theoreticalTasks *pxTasks );
+bool prvTheoreticalTestSchedulability( theoreticalTasks *pxTasks );
+
+/* Creates some theoretical tasks for testing. */
+void prvCreateTheoreticalTasks( theoreticalTasks *pxTasks );
+
+/*
+ * Real tasks.
+ */
+void vShortTaskFunction( void *pvParameters );
+void vMediumTaskFunction( void *pvParameters );
+void vLongTaskFunction( void *pvParameters );
+
+/* Special tasks that randomly creates aperiodic tasks. For testing. */
+void vAperiodicSeederTaskFunction( void *pvParameters );
+
+/*-----------------------------------------------------------*/
+
+/*
+ * Helpers.
+ */
+void prvPrintString( char *pcMessage );
+
+/*-----------------------------------------------------------*/
 
 /*
  * Prototypes for the standard FreeRTOS callback/hook functions implemented
  * within this file.
  */
 void vApplicationMallocFailedHook( void );
-void vApplicationIdleHook( void );
-void vApplicationTickHook( void );
-
-/* Task function to check demo status. */
-static void prvCheckTask( void *pvParameters );
-
-/* The variable into which error messages are latched. */
-static char *pcStatusMessage = "OK";
 
 /*-----------------------------------------------------------*/
 
 int main ( void )
 {
-	/* Start the check task as described at the top of this file. */
-	xTaskCreate( prvCheckTask, "Check", configMINIMAL_STACK_SIZE, NULL, mainCHECK_TASK_PRIORITY, NULL );
+    if ( mainTHEORETICAL_VALIDATION_RUN )
+    {
+        theoreticalTasks *xTheoreticalTasks = malloc( sizeof( theoreticalTasks ) );
+        xTheoreticalTasks->iPeriodicCount = 0;
+        xTheoreticalTasks->iAperiodicCount = 0;
+        prvCreateTheoreticalTasks( xTheoreticalTasks );
+        if ( prvTheoreticalTestSchedulability( xTheoreticalTasks ) )
+        {
+            printf( "TRUE - possible to schedule all tasks" );
+            fflush( stdout );
+        }
+        else
+        {
+            printf( "FALSE - impossible to schedule all tasks" );
+            fflush( stdout );
+        }
+        return 0;
+    }
 
-	/* Create the standard demo tasks. */
-	/*
-	vStartIntegerMathTasks( mainINTEGER_TASK_PRIORITY );
-	vStartMathTasks( mainFLOP_TASK_PRIORITY );
-	vStartBlockingQueueTasks( mainBLOCK_Q_PRIORITY );
-	vStartPolledQueueTasks( mainQUEUE_POLL_PRIORITY );
-	vStartSemaphoreTasks( mainSEM_TEST_PRIORITY );
-	vStartDynamicPriorityTasks();
-	vCreateBlockTimeTasks();
-	vStartGenericQueueTasks( mainGEN_QUEUE_TASK_PRIORITY );
-	vStartQueuePeekTasks();
-	vStartCountingSemaphoreTasks();
-	vStartRecursiveMutexTasks();
+    xPeriodicTaskCreate( vMediumTaskFunction,
+                         "p-mt-5",
+                         configMINIMAL_STACK_SIZE,
+                         NULL,
+                         tskIDLE_PRIORITY + 5,
+                         1000 );
+    xPeriodicTaskCreate( vShortTaskFunction,
+                         "p-st-5",
+                         configMINIMAL_STACK_SIZE,
+                         NULL,
+                         tskIDLE_PRIORITY + 5,
+                         5000 );
+    xPeriodicTaskCreate( vMediumTaskFunction,
+                         "p-mt-4",
+                         configMINIMAL_STACK_SIZE,
+                         NULL,
+                         tskIDLE_PRIORITY + 4,
+                         3000 );
+    xPeriodicTaskCreate( vLongTaskFunction,
+                         "p-lt-3",
+                         configMINIMAL_STACK_SIZE,
+                         NULL,
+                         tskIDLE_PRIORITY + 3,
+                         5000 );
 
-	vCreateAbortDelayTasks();
-	vStartEventGroupTasks();
-	vStartInterruptSemaphoreTasks();
-	vStartQueueSetTasks();
-	vStartQueueSetPollingTask();
-	vStartQueueOverwriteTask( mainQUEUE_OVERWRITE_PRIORITY );
-	vStartTaskNotifyTask();
-	*/
-
-	#if( configUSE_PREEMPTION != 0  )
-	{
-		/* Don't expect these tasks to pass when preemption is not used. */
-		//vStartTimerDemoTask( mainTIMER_TEST_PERIOD );
-	}
-	#endif
-
-	/* The suicide tasks must be created last as they need to know how many
-	tasks were running prior to their creation.  This then allows them to
-	ascertain whether or not the correct/expected number of tasks are running at
-	any given time. */
-	//vCreateSuicidalTasks( mainCREATOR_TASK_PRIORITY );
+    if ( configSEED_APERIODIC_TASKS )
+    {
+        xPeriodicTaskCreate( vAperiodicSeederTaskFunction,
+                             "p-ast-1",
+                             configMINIMAL_STACK_SIZE,
+                             NULL,
+                             tskIDLE_PRIORITY + 1,
+                             200 );
+    }
 
 	/* Start the scheduler itself. */
 	vTaskStartScheduler();
@@ -197,191 +223,121 @@ int main ( void )
 }
 /*-----------------------------------------------------------*/
 
-static void prvCheckTask( void *pvParameters )
+void prvTheoreticalAddPeriodic( int32_t lPeriod, int32_t lDuration, theoreticalTasks *pxTasks )
 {
-TickType_t xNextWakeTime;
-const TickType_t xCycleFrequency = pdMS_TO_TICKS( 2500UL );
+    pxTasks->xPeriodicTasks[pxTasks->iPeriodicCount].lPeriodMS = lPeriod;
+    pxTasks->xPeriodicTasks[pxTasks->iPeriodicCount].lDurationMS = lDuration;
+    pxTasks->iPeriodicCount++;
+}
 
-	/* Just to remove compiler warning. */
-	( void ) pvParameters;
+void prvTheoreticalAddAperiodic( int32_t lArrival, int32_t lDuration, theoreticalTasks *pxTasks )
+{
+    pxTasks->xAperiodicTasks[pxTasks->iAperiodicCount].lArrivalMS = lArrival;
+    pxTasks->xAperiodicTasks[pxTasks->iAperiodicCount].lDurationMS = lDuration;
+    pxTasks->iAperiodicCount++;
+}
 
-	/* Initialise xNextWakeTime - this only needs to be done once. */
-	xNextWakeTime = xTaskGetTickCount();
+bool prvTheoreticalTestSchedulability( theoreticalTasks *pxTasks )
+{
+    // TODO
+    return false;
+}
 
-	for( ;; )
-	{
-		/* Place this task in the blocked state until it is time to run again. */
-		vTaskDelayUntil( &xNextWakeTime, xCycleFrequency );
+void prvCreateTheoreticalTasks( theoreticalTasks *pxTasks )
+{
+    // TODO
+}
+/*-----------------------------------------------------------*/
 
-		/* Check the standard demo tasks are running without error. */
-		#if( configUSE_PREEMPTION != 0 )
-		{
-			/* These tasks are only created when preemption is used. */
-			/*
-			if( xAreTimerDemoTasksStillRunning( xCycleFrequency ) != pdTRUE )
-			{
-				pcStatusMessage = "Error: TimerDemo";
-			}
-			*/
-		}
-		#endif
+void vShortTaskFunction( void *pvParameters )
+{
+    /* Variables can be declared just as per a normal function. Each instance of a task
+    created using this example function will have its own copy of the lVariableExample
+    variable. This would not be true if the variable was declared static – in which case
+    only one copy of the variable would exist, and this copy would be shared by each
+    created instance of the task. (The prefixes added to variable names are described in
+    section 1.5, Data Types and Coding Style Guide.) */
+    int32_t li;
+    prvPrintString( "short task" );
+    for ( li = 0; li < 50000000; li++ );
+    /* Should the task implementation ever break out of the above loop, then the task
+    must be deleted before reaching the end of its implementing function. The NULL
+    parameter passed to the vTaskDelete() API function indicates that the task to be
+    deleted is the calling (this) task. The convention used to name API functions is
+    described in section 1.5, Data Types and Coding Style Guide. */
+    vTaskDelete( NULL );
+}
 
-		/*
-		if( xAreIntegerMathsTaskStillRunning() != pdTRUE )
-	    {
-			pcStatusMessage = "Error: IntMath";
-	    }
-		else if( xAreMathsTaskStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: Flop";
-		}
-		else if( xAreBlockingQueuesStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: BlockQueue";
-		}
-	    else if( xArePollingQueuesStillRunning() != pdTRUE )
-	    {
-			pcStatusMessage = "Error: PollQueue";
-	    }
-		else if( xAreSemaphoreTasksStillRunning() != pdTRUE )
-	    {
-		    pcStatusMessage = "Error: SemTest";
-	    }
-		else if( xAreDynamicPriorityTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: Dynamic";
-		}
-		else if( xAreBlockTimeTestTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: Block time";
-		}
-		else if( xAreGenericQueueTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: GenQueue";
-		}
-		else if( xAreQueuePeekTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: QueuePeek";
-		}
-		else if( xAreCountingSemaphoreTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: CountSem";
-		}
-		else if( xAreRecursiveMutexTasksStillRunning() != pdTRUE )
-	    {
-			pcStatusMessage = "Error: RecMutex";
-		}
-		else if( xAreAbortDelayTestTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: Abort delay";
-		}
-		else if( xAreEventGroupTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: EventGroup";
-		}
-		else if( xAreInterruptSemaphoreTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: IntSem";
-		}
-		else if( xAreQueueSetTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: Queue set";
-		}
-		else if( xAreQueueSetPollTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: Queue set polling";
-		}
-		else if( xIsQueueOverwriteTaskStillRunning() != pdPASS )
-		{
-			pcStatusMessage = "Error: Queue overwrite";
-		}
-		else if( xAreTaskNotificationTasksStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error:  Notification";
-		}
-		else if( xIsCreateTaskStillRunning() != pdTRUE )
-		{
-			pcStatusMessage = "Error: Death";
-		}
-		*/
-		
-		/* This is the only task that uses stdout so its ok to call printf()
-		directly. */
-		printf( ( char * ) "%s - %u\n", pcStatusMessage, ( unsigned int ) xTaskGetTickCount() );
-		fflush( stdout );
-	}
+void vMediumTaskFunction( void *pvParameters )
+{
+    int32_t li;
+    prvPrintString( "medium task" );
+    for ( li = 0; li < 100000000; li++ );
+    vTaskDelete( NULL );
+}
+
+void vLongTaskFunction( void *pvParameters )
+{
+    int32_t li;
+    prvPrintString( "long task" );
+    for ( li = 0; li < 1000000000; li++ );
+    vTaskDelete( NULL );
+}
+
+void vAperiodicSeederTaskFunction( void *pvParameters )
+{
+    int32_t iTaskCreated;
+    bool xCreateAperiodicTask = ( rand() % 100 ) < mainAPERIODIC_TASK_PROBABILITY;
+    if ( xCreateAperiodicTask )
+    {
+        iTaskCreated = rand() % 100;
+        if (iTaskCreated < mainAPERIODIC_SHORT_TASK_PROBABILITY_UPPER)
+        {
+            xAperiodicTaskCreate( vShortTaskFunction,
+                                  "a-st",
+                                  configMINIMAL_STACK_SIZE,
+                                  NULL );
+        }
+        else if (iTaskCreated > mainAPERIODIC_LONG_TASK_PROBABILITY_LOWER)
+        {
+            xAperiodicTaskCreate( vLongTaskFunction,
+                                  "a-lt",
+                                  configMINIMAL_STACK_SIZE,
+                                  NULL );
+        }
+        else
+        {
+            xAperiodicTaskCreate( vMediumTaskFunction,
+                                  "a-mt",
+                                  configMINIMAL_STACK_SIZE,
+                                  NULL );
+        }
+    }
+    vTaskDelete( NULL );
+}
+/*-----------------------------------------------------------*/
+
+void prvPrintString( char *pcMessage )
+{
+    printf( "%s\n", pcMessage );
+    fflush( stdout );
 }
 /*-----------------------------------------------------------*/
 
 void vApplicationMallocFailedHook( void )
 {
-	/* vApplicationMallocFailedHook() will only be called if
-	configUSE_MALLOC_FAILED_HOOK is set to 1 in FreeRTOSConfig.h.  It is a hook
-	function that will get called if a call to pvPortMalloc() fails.
-	pvPortMalloc() is called internally by the kernel whenever a task, queue,
-	timer or semaphore is created.  It is also called by various parts of the
-	demo application.  If heap_1.c or heap_2.c are used, then the size of the
-	heap available to pvPortMalloc() is defined by configTOTAL_HEAP_SIZE in
-	FreeRTOSConfig.h, and the xPortGetFreeHeapSize() API function can be used
-	to query the size of free heap space that remains (although it does not
-	provide information on how the remaining heap might be fragmented). */
-	vAssertCalled( __LINE__, __FILE__ );
+    /* vApplicationMallocFailedHook() will only be called if
+    configUSE_MALLOC_FAILED_HOOK is set to 1 in FreeRTOSConfig.h.  It is a hook
+    function that will get called if a call to pvPortMalloc() fails.
+    pvPortMalloc() is called internally by the kernel whenever a task, queue,
+    timer or semaphore is created.  It is also called by various parts of the
+    demo application.  If heap_1.c or heap_2.c are used, then the size of the
+    heap available to pvPortMalloc() is defined by configTOTAL_HEAP_SIZE in
+    FreeRTOSConfig.h, and the xPortGetFreeHeapSize() API function can be used
+    to query the size of free heap space that remains (although it does not
+    provide information on how the remaining heap might be fragmented). */
+    vAssertCalled( __LINE__, __FILE__ );
 }
-/*-----------------------------------------------------------*/
-
-void vApplicationIdleHook( void )
-{
-	/* vApplicationIdleHook() will only be called if configUSE_IDLE_HOOK is set
-	to 1 in FreeRTOSConfig.h.  It will be called on each iteration of the idle
-	task.  It is essential that code added to this hook function never attempts
-	to block in any way (for example, call xQueueReceive() with a block time
-	specified, or call vTaskDelay()).  If the application makes use of the
-	vTaskDelete() API function (as this demo application does) then it is also
-	important that vApplicationIdleHook() is permitted to return to its calling
-	function, because it is the responsibility of the idle task to clean up
-	memory allocated by the kernel to any task that has since been deleted. */
-
-		/* Call the idle task processing used by the full demo.  The simple
-		blinky demo does not use the idle task hook. */
-		//vFullDemoIdleFunction();
-}
-/*-----------------------------------------------------------*/
-
-void vApplicationTickHook( void )
-{
-	/* This function will be called by each tick interrupt if
-	configUSE_TICK_HOOK is set to 1 in FreeRTOSConfig.h.  User code can be
-	added here, but the tick hook is called from an interrupt context, so
-	code must not attempt to block, and only the interrupt safe FreeRTOS API
-	functions can be used (those that end in FromISR()). */
-
-	/* Call the periodic timer test, which tests the timer API functions that
-	can be called from an ISR. */
-	#if( configUSE_PREEMPTION != 0 )
-	{
-		/* Only created when preemption is used. */
-		//vTimerPeriodicISRTests();
-	}
-	#endif
-
-	/* Call the periodic queue overwrite from ISR demo. */
-	//vQueueOverwritePeriodicISRDemo();
-
-	/* Write to a queue that is in use as part of the queue set demo to
-	demonstrate using queue sets from an ISR. */
-	//vQueueSetAccessQueueSetFromISR();
-	//vQueueSetPollingInterruptAccess();
-
-	/* Exercise event groups from interrupts. */
-	//vPeriodicEventGroupsProcessing();
-
-	/* Exercise giving mutexes from an interrupt. */
-	//vInterruptSemaphorePeriodicTest();
-
-	/* Exercise using task notifications from an interrupt. */
-	//xNotifyTaskFromISR();
-}
-/*-----------------------------------------------------------*/
 
 void vAssertCalled( unsigned long ulLine, const char * const pcFileName )
 {

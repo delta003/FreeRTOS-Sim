@@ -363,6 +363,28 @@ is used in assert() statements. */
 							void * const pvParameters,
 							UBaseType_t uxPriority,
 							TaskHandle_t * const pxCreatedTask ) PRIVILEGED_FUNCTION; /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+
+    /* This is original xTaskCreate. xTaskCreate just calls this with xIsPeriodic = pdFALSE and ulPeriod = 0. */
+    BaseType_t xTaskCreateExtended(	TaskFunction_t pxTaskCode,
+                                    const char * const pcName,
+                                    const uint16_t usStackDepth,
+                                    void * const pvParameters,
+                                    UBaseType_t uxPriority,
+                                    TaskHandle_t * const pxCreatedTask,
+                                    BaseType_t xIsPeriodic,
+                                    const uint32_t ulPeriod) PRIVILEGED_FUNCTION;
+
+	BaseType_t xPeriodicTaskCreate( TaskFunction_t pxTaskCode,
+									const char * const pcName,
+                                    const uint16_t usStackDepth,
+                                    void * const pvParameters,
+                                    UBaseType_t uxPriority,
+                                    const uint32_t ulPeriodMS );
+
+    BaseType_t xAperiodicTaskCreate( TaskFunction_t pxTaskCode,
+                                     const char * const pcName,
+                                     const uint16_t usStackDepth,
+                                     void * const pvParameters );
 #endif
 
 /**

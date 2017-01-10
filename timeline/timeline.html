@@ -1,0 +1,76 @@
+<html>
+
+<head>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+        google.charts.load('current', {
+            'packages': ['timeline']
+        });
+        //google.charts.setOnLoadCallback(drawChart);
+
+        function processLog(loglines) {
+            var ret = [];
+            var last_task = loglines[0];
+            var last_task_st = 0;
+            for (var line = 1; line < loglines.length - 1; line++) {
+                if (loglines[line] != last_task)
+                {
+                    ret.push([last_task, last_task_st, line - 1]);
+                    last_task = loglines[line];
+                    last_task_st = line;
+                }
+            }
+            ret.push([last_task, last_task_st, loglines.length - 2]);
+            return ret;
+        }
+
+        function drawChart(loglines) {
+            var container = document.getElementById('timeline');
+            var chart = new google.visualization.Timeline(container);
+            var dataTable = new google.visualization.DataTable();
+
+            dataTable.addColumn({
+                type: 'string',
+                id: 'TaskName'
+            });
+            dataTable.addColumn({
+                type: 'number',
+                id: 'Start'
+            });
+            dataTable.addColumn({
+                type: 'number',
+                id: 'End'
+            });
+
+            dataTable.addRows(processLog(loglines));
+
+            var options = {
+                timeline: {
+                    groupByRowLabel: true
+                }
+            };
+            chart.draw(dataTable, options);
+        }
+    </script>
+</head>
+
+<body>
+    <input type="file" name="file" id="file">
+    <div id="timeline" style="height: 500px;"></div>
+
+    <script>
+        document.getElementById('file').onchange = function() {
+            var file = this.files[0];
+
+            var reader = new FileReader();
+            reader.onload = function(progressEvent) {
+                // By lines
+                var lines = this.result.split('\n');
+                drawChart(lines);
+            };
+            reader.readAsText(file);
+        };
+    </script>
+</body>
+
+</html>
