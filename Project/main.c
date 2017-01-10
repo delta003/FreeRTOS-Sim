@@ -90,6 +90,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -98,8 +99,8 @@
 #define mainTHEORETICAL_MAX_TASKS                   ( 50 )
 
 #define mainAPERIODIC_TASK_PROBABILITY              ( 80 )
-#define mainAPERIODIC_SHORT_TASK_PROBABILITY_UPPER  ( 50 )
-#define mainAPERIODIC_LONG_TASK_PROBABILITY_LOWER   ( 80 )
+#define mainAPERIODIC_SHORT_TASK_PROBABILITY_UPPER  ( 80 )
+#define mainAPERIODIC_LONG_TASK_PROBABILITY_LOWER   ( 99 )
 
 /*
  * Support for theoretical validation of schedulability.
@@ -147,6 +148,7 @@ void vAperiodicSeederTaskFunction( void *pvParameters );
  * Helpers.
  */
 void prvPrintString( char *pcMessage );
+char * prvAperiodicRandName( size_t length );
 
 /*-----------------------------------------------------------*/
 
@@ -178,6 +180,7 @@ int main ( void )
         }
         return 0;
     }
+    srand( time( 0 ) );
 
     xPeriodicTaskCreate( vMediumTaskFunction,
                          "p-mt-5",
@@ -197,12 +200,12 @@ int main ( void )
                          NULL,
                          tskIDLE_PRIORITY + 4,
                          3000 );
-    xPeriodicTaskCreate( vLongTaskFunction,
+    /*xPeriodicTaskCreate( vLongTaskFunction,
                          "p-lt-3",
                          configMINIMAL_STACK_SIZE,
                          NULL,
                          tskIDLE_PRIORITY + 3,
-                         5000 );
+                         5000 );*/
 
     if ( configSEED_APERIODIC_TASKS )
     {
@@ -211,7 +214,7 @@ int main ( void )
                              configMINIMAL_STACK_SIZE,
                              NULL,
                              tskIDLE_PRIORITY + 6,
-                             2000 );
+                             1000 );
     }
 
 	/* Start the scheduler itself. */
@@ -288,24 +291,25 @@ void vAperiodicSeederTaskFunction( void *pvParameters )
     if ( xCreateAperiodicTask )
     {
         iTaskCreated = rand() % 100;
+        prvPrintString("Aperiodic task created.");
         if (iTaskCreated < mainAPERIODIC_SHORT_TASK_PROBABILITY_UPPER)
         {
             xAperiodicTaskCreate( vShortTaskFunction,
-                                  "a-st",
+                                  prvAperiodicRandName(10),
                                   configMINIMAL_STACK_SIZE,
                                   NULL );
         }
         else if (iTaskCreated > mainAPERIODIC_LONG_TASK_PROBABILITY_LOWER)
         {
             xAperiodicTaskCreate( vLongTaskFunction,
-                                  "a-lt",
+                                  prvAperiodicRandName(10),
                                   configMINIMAL_STACK_SIZE,
                                   NULL );
         }
         else
         {
             xAperiodicTaskCreate( vMediumTaskFunction,
-                                  "a-mt",
+                                  prvAperiodicRandName(10),
                                   configMINIMAL_STACK_SIZE,
                                   NULL );
         }
@@ -345,5 +349,31 @@ void vAssertCalled( unsigned long ulLine, const char * const pcFileName )
 	}
 	taskEXIT_CRITICAL();
 	exit(-1);
+}
+/*-----------------------------------------------------------*/
+
+char * prvAperiodicRandName(size_t length) {
+
+    static char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    static int ncharset = 62;
+    char *randomString = NULL;
+    int n;
+
+    if (length) {
+        randomString = malloc(sizeof(char) * (length + 1));
+
+        if (randomString) {
+            randomString[0] = 'a';
+            randomString[1] = '-';
+            for (n = 2; n < length; n++) {
+                int key = rand() % ncharset;
+                randomString[n] = charset[key];
+            }
+
+            randomString[length] = '\0';
+        }
+    }
+
+    return randomString;
 }
 /*-----------------------------------------------------------*/
