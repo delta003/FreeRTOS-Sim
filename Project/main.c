@@ -120,9 +120,9 @@ typedef struct tskAperiodic
 typedef struct theoreticalTasks
 {
     tskPeriodic xPeriodicTasks[ mainTHEORETICAL_MAX_TASKS ];
-    int16_t iPeriodicCount;
+    uint16_t usPeriodicCount;
     tskAperiodic xAperiodicTasks[ mainTHEORETICAL_MAX_TASKS ];
-    int16_t iAperiodicCount;
+    uint16_t usAperiodicCount;
 } theoreticalTasks;
 
 void prvTheoreticalAddPeriodic( int32_t, int32_t, theoreticalTasks *pxTasks );
@@ -130,7 +130,7 @@ void prvTheoreticalAddAperiodic( int32_t, int32_t, theoreticalTasks *pxTasks );
 bool prvTheoreticalTestSchedulability( theoreticalTasks *pxTasks );
 
 /* Creates some theoretical tasks for testing. */
-void prvCreateTheoreticalTasks( theoreticalTasks *pxTasks );
+void prvCreateTheoreticalTasks( theoreticalTasks *pxTasks, bool possible );
 
 /*
  * Real tasks.
@@ -165,9 +165,9 @@ int main ( void )
     if ( mainTHEORETICAL_VALIDATION_RUN )
     {
         theoreticalTasks *xTheoreticalTasks = malloc( sizeof( theoreticalTasks ) );
-        xTheoreticalTasks->iPeriodicCount = 0;
-        xTheoreticalTasks->iAperiodicCount = 0;
-        prvCreateTheoreticalTasks( xTheoreticalTasks );
+        xTheoreticalTasks->usPeriodicCount = 0U;
+        xTheoreticalTasks->usAperiodicCount = 0U;
+        prvCreateTheoreticalTasks( xTheoreticalTasks, true );
         if ( prvTheoreticalTestSchedulability( xTheoreticalTasks ) )
         {
             printf( "TRUE - possible to schedule all tasks" );
@@ -180,7 +180,7 @@ int main ( void )
         }
         return 0;
     }
-    srand( time( 0 ) );
+    srand( (unsigned) time( 0 ) );
 
     xPeriodicTaskCreate( vMediumTaskFunction,
                          "p-mt-5",
@@ -228,27 +228,44 @@ int main ( void )
 
 void prvTheoreticalAddPeriodic( int32_t lPeriod, int32_t lDuration, theoreticalTasks *pxTasks )
 {
-    pxTasks->xPeriodicTasks[pxTasks->iPeriodicCount].lPeriodMS = lPeriod;
-    pxTasks->xPeriodicTasks[pxTasks->iPeriodicCount].lDurationMS = lDuration;
-    pxTasks->iPeriodicCount++;
+    pxTasks->xPeriodicTasks[pxTasks->usPeriodicCount].lPeriodMS = lPeriod;
+    pxTasks->xPeriodicTasks[pxTasks->usPeriodicCount].lDurationMS = lDuration;
+    pxTasks->usPeriodicCount++;
 }
 
 void prvTheoreticalAddAperiodic( int32_t lArrival, int32_t lDuration, theoreticalTasks *pxTasks )
 {
-    pxTasks->xAperiodicTasks[pxTasks->iAperiodicCount].lArrivalMS = lArrival;
-    pxTasks->xAperiodicTasks[pxTasks->iAperiodicCount].lDurationMS = lDuration;
-    pxTasks->iAperiodicCount++;
+    pxTasks->xAperiodicTasks[pxTasks->usAperiodicCount].lArrivalMS = lArrival;
+    pxTasks->xAperiodicTasks[pxTasks->usAperiodicCount].lDurationMS = lDuration;
+    pxTasks->usAperiodicCount++;
 }
 
 bool prvTheoreticalTestSchedulability( theoreticalTasks *pxTasks )
 {
-    // TODO
-    return false;
+    double sum = 0.0;
+    int i;
+    for (i = 0; i < pxTasks->usPeriodicCount; i++ )
+        sum += 1.0 * pxTasks->xPeriodicTasks[i].lDurationMS / pxTasks->xPeriodicTasks[i].lPeriodMS;
+    if ( pxTasks->usAperiodicCount > 0 ) return sum < 1.0;
+    return sum <= 1.0;
 }
 
-void prvCreateTheoreticalTasks( theoreticalTasks *pxTasks )
+void prvCreateTheoreticalTasks( theoreticalTasks *pxTasks, bool possible )
 {
-    // TODO
+    if ( possible )
+    {
+        prvTheoreticalAddPeriodic( 1000, 500, pxTasks );
+        prvTheoreticalAddPeriodic( 1000, 300, pxTasks );
+        prvTheoreticalAddPeriodic( 100, 20, pxTasks );
+    }
+    else
+    {
+        prvTheoreticalAddPeriodic( 1000, 500, pxTasks );
+        prvTheoreticalAddPeriodic( 1000, 300, pxTasks );
+        prvTheoreticalAddPeriodic( 100, 20, pxTasks );
+        //prvTheoreticalAddPeriodic( 5000, 10, pxTasks );
+        prvTheoreticalAddAperiodic( 100, 100, pxTasks );
+    }
 }
 /*-----------------------------------------------------------*/
 
