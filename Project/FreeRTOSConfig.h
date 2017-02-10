@@ -14,18 +14,18 @@
  *----------------------------------------------------------*/
 
 #define configUSE_PREEMPTION					1
-#define configUSE_IDLE_HOOK						1
-#define configUSE_TICK_HOOK						1
-#define configTICK_RATE_HZ				( ( portTickType ) 1000 )
-#define configMINIMAL_STACK_SIZE		( ( unsigned portSHORT ) 64 ) /* This can be made smaller if required. */
-#define configTOTAL_HEAP_SIZE			( ( size_t ) ( 64 * 1024 ) )
-#define configMAX_TASK_NAME_LEN			( 16 )
-#define configUSE_TRACE_FACILITY    	0
-#define configUSE_16_BIT_TICKS      	0
-#define configIDLE_SHOULD_YIELD			1
-#define configUSE_MUTEXES				1
-#define configCHECK_FOR_STACK_OVERFLOW	0 /* Do not use this option on the PC port. */
-#define configUSE_RECURSIVE_MUTEXES		1
+#define configUSE_IDLE_HOOK						0
+#define configUSE_TICK_HOOK						0
+#define configTICK_RATE_HZ				        ( ( portTickType ) 1000 )
+#define configMINIMAL_STACK_SIZE		        ( ( unsigned portSHORT ) 64 ) /* This can be made smaller if required. */
+#define configTOTAL_HEAP_SIZE			        ( ( size_t ) ( 64 * 1024 ) )
+#define configMAX_TASK_NAME_LEN			        ( 16 )
+#define configUSE_TRACE_FACILITY    	        0
+#define configUSE_16_BIT_TICKS      	        0
+#define configIDLE_SHOULD_YIELD			        1
+#define configUSE_MUTEXES				        1
+#define configCHECK_FOR_STACK_OVERFLOW	        0 /* Do not use this option on the PC port. */
+#define configUSE_RECURSIVE_MUTEXES		        1
 #define configQUEUE_REGISTRY_SIZE				20
 #define configUSE_MALLOC_FAILED_HOOK			1
 #define configUSE_APPLICATION_TASK_TAG			1
@@ -42,9 +42,18 @@
 #define configTIMER_QUEUE_LENGTH				20
 #define configTIMER_TASK_STACK_DEPTH			( configMINIMAL_STACK_SIZE * 2 )
 
-#define configMAX_PRIORITIES		( 10 )
+#define configMAX_PRIORITIES		            ( 10 )
 
-#define configGENERATE_RUN_TIME_STATS		1
+#define configGENERATE_RUN_TIME_STATS		    0
+
+/* Periodic and aperiodic tasks config. */
+#define configCREATE_POLLING_SERVER             1
+#define configPOLLING_SERVER_TICKS_CAP          1000
+#define configPOLLING_SERVER_PERIOD_MS          2000
+#define configSEED_APERIODIC_TASKS              1
+#define configPRINT_FOR_TIMELINE                1
+#define configTIMELINE_MAX_TICKS                10000
+#define configTIMELINE_FILE_PATH                "/Users/mbakovic/FreeRTOS-Sim/timeline/data.txt"
 
 /* Set the following definitions to 1 to include the API function, or zero
 to exclude the API function.  In most cases the linker will remove unused
