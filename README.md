@@ -1,5 +1,5 @@
 # FreeRTOS-Sim
-FreeRTOS simulator for POSIX (Linux, OS X and maybe other POSIX OS)
+FreeRTOS simulator for POSIX (Linux, OS X and maybe other POSIX OS). This fork adds support for periodic and aperiodic tasks. Project is written for Real-time Systems class at Faculty of Computing in Belgrade (RAF).
 
 Based on the Linux simulator originally developed by William Davy for FreeRTOS v5.3, the goal of this work is to keep FreeRTOS POSIX simulator in a clean seperate package and up to date with the latest FreeRTOS releases (v9.0.0 currently).
 
